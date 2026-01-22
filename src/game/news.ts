@@ -18,12 +18,15 @@ export function maybeEmitMilestones(state: GameState): GameState {
   let next = state;
   if (!flags.half && remainingFrac <= 0.5) {
     next = pushNews(next, `${stage.name}: 50% of accessible matter consumed.`);
+    next = { ...next, trust: next.trust + 1, unusedTrust: next.unusedTrust + 1 };
     next = setFlag(next, state.stageId, { ...flags, half: true });
   } else if (!flags.ten && remainingFrac <= 0.1) {
     next = pushNews(next, `${stage.name}: 90% consumed. Supply lines tighten.`);
+    next = { ...next, trust: next.trust + 1, unusedTrust: next.unusedTrust + 1 };
     next = setFlag(next, state.stageId, { ...flags, ten: true });
   } else if (!flags.one && remainingFrac <= 0.01) {
     next = pushNews(next, `${stage.name}: Final reserves detected.`);
+    next = { ...next, trust: next.trust + 1, unusedTrust: next.unusedTrust + 1 };
     next = setFlag(next, state.stageId, { ...flags, one: true });
   }
   return next;

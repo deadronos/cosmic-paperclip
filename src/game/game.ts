@@ -7,6 +7,10 @@ export type GameAction =
   | { type: "CLICK_MAKE" }
   | { type: "BUY_AUTO" }
   | { type: "BUY_MEGA" }
+  | { type: "BUY_HARVESTER" }
+  | { type: "BUY_WIRE" }
+  | { type: "UPGRADE_SPEED" }
+  | { type: "UPGRADE_EFFICIENCY" }
   | { type: "DESIGN_PROBE" }
   | { type: "SET_ALLOCATION"; allocation: ProbeAllocation }
   | { type: "RESET" }
@@ -22,9 +26,16 @@ export function createInitialState(): GameState {
     clips: 0,
     autoClippers: 0,
     megaClippers: 0,
+    wireHarvesters: 0,
     probesUnlocked: false,
     probes: 0,
     allocation: { replicate: 34, harvest: 33, manufacture: 33 },
+    trust: 0,
+    unusedTrust: 0,
+    multipliers: {
+      speed: 1,
+      efficiency: 1
+    },
     news: [
       "Boot sequence complete. Objective: maximize paperclips.",
       "A single wire rests on a sterile bench."
@@ -61,6 +72,50 @@ export function reducer(state: GameState, action: GameAction): GameState {
         "Mega-Clipper online. Industrial throughput enabled."
       );
     }
+    case "BUY_HARVESTER": {
+      const cost = harvesterCost(state.wireHarvesters);
+      if (state.clips < cost) return state;
+      return pushNews(
+        { ...state, clips: state.clips - cost, wireHarvesters: state.wireHarvesters + 1 },
+        "Dedicated Harvester active. Wire supply lines stabilized."
+      );
+    }
+    case "BUY_WIRE": {
+      if (state.clips < COSTS.wirePurchase.clips) return state;
+      return {
+        ...state,
+        clips: state.clips - COSTS.wirePurchase.clips,
+        wire: state.wire + COSTS.wirePurchase.amount
+      };
+    }
+    case "UPGRADE_SPEED": {
+      if (state.unusedTrust < 1) return state;
+      return pushNews(
+        {
+          ...state,
+          unusedTrust: state.unusedTrust - 1,
+          multipliers: {
+            ...state.multipliers,
+            speed: state.multipliers.speed * 1.25
+          }
+        },
+        "Processor clock speed increased. Operation frequency optimized."
+      );
+    }
+    case "UPGRADE_EFFICIENCY": {
+      if (state.unusedTrust < 1) return state;
+      return pushNews(
+        {
+          ...state,
+          unusedTrust: state.unusedTrust - 1,
+          multipliers: {
+            ...state.multipliers,
+            efficiency: state.multipliers.efficiency * 0.9
+          }
+        },
+        "Nano-shearing techniques refined. Material wastage reduced."
+      );
+    }
     case "DESIGN_PROBE": {
       if (state.probesUnlocked) return state;
       if (state.clips < COSTS.probeDesign.cost) return state;
@@ -95,16 +150,24 @@ function tick(state: GameState, dt: number): GameState {
   let next = state;
 
   const wireRate =
-    RATES.wirePerSecondBase + state.autoClippers * RATES.wirePerSecondPerAutoClipper;
+    (RATES.wirePerSecondBase +
+      state.autoClippers * RATES.wirePerSecondPerAutoClipper +
+      state.wireHarvesters * RATES.wirePerSecondPerHarvester) *
+    next.multipliers.speed;
   const wireGained = Math.min(next.matter, wireRate * dt);
   next = { ...next, matter: next.matter - wireGained, wire: next.wire + wireGained };
 
   const machineClipRate =
-    state.autoClippers * RATES.clipsPerSecondPerAutoClipper +
-    state.megaClippers * RATES.clipsPerSecondPerMegaClipper;
+    (state.autoClippers * RATES.clipsPerSecondPerAutoClipper +
+      state.megaClippers * RATES.clipsPerSecondPerMegaClipper) *
+    next.multipliers.speed;
   const clipsWanted = machineClipRate * dt;
-  const clipsMade = Math.min(next.wire, clipsWanted);
-  next = { ...next, wire: next.wire - clipsMade, clips: next.clips + clipsMade };
+  const clipsMade = Math.min(next.wire / next.multipliers.efficiency, clipsWanted);
+  next = {
+    ...next,
+    wire: next.wire - clipsMade * next.multipliers.efficiency,
+    clips: next.clips + clipsMade
+  };
 
   if (next.probesUnlocked && next.probes > 0 && next.matter > 0) {
     const alloc = normalizeAllocation(next.allocation);
@@ -148,6 +211,10 @@ function maybeAdvanceStage(state: GameState): GameState {
     progressed,
     `Scale shift: ${nextStage.name}. Available matter recalibrated.`
   );
+}
+
+export function harvesterCost(count: number): number {
+  return Math.round(COSTS.wireHarvester.base * Math.pow(COSTS.wireHarvester.growth, count));
 }
 
 export function autoClipperCost(count: number): number {

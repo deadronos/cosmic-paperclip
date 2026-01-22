@@ -50,14 +50,23 @@ export const STAGE_BY_ID: Record<StageId, Stage> = STAGES.reduce(
 export const COSTS = {
   autoClipper: { base: 15, growth: 1.15 },
   megaClipper: { base: 500, growth: 1.22 },
-  probeDesign: { cost: 100_000 }
+  wireHarvester: { base: 100, growth: 1.25 },
+  probeDesign: { cost: 100_000 },
+  wirePurchase: { clips: 100, amount: 1000 }
 } as const;
 
 export const RATES = {
   wirePerSecondBase: 1.2,
   wirePerSecondPerAutoClipper: 0.15,
+  wirePerSecondPerHarvester: 2.5,
   clipsPerSecondPerAutoClipper: 0.5,
   clipsPerSecondPerMegaClipper: 6,
   probeReplicationPerSecond: 0.0022
+} as const;
+
+export const MULTIPLIERS = {
+  speedBoost: 1.25,
+  efficiencyBoost: 0.9,
+  trustCost: 1
 } as const;
 

@@ -24,9 +24,16 @@ export type GameState = {
   clips: number;
   autoClippers: number;
   megaClippers: number;
+  wireHarvesters: number;
   probesUnlocked: boolean;
   probes: number;
   allocation: ProbeAllocation;
+  trust: number;
+  unusedTrust: number;
+  multipliers: {
+    speed: number;
+    efficiency: number;
+  };
   news: string[];
   milestoneFlags: Record<string, { half: boolean; ten: boolean; one: boolean }>;
 };

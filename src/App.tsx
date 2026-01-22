@@ -14,6 +14,7 @@ import { formatNumber, formatRate } from "@/game/format";
 import {
   autoClipperCost,
   createInitialState,
+  harvesterCost,
   megaClipperCost,
   reducer
 } from "@/game/game";
@@ -23,7 +24,13 @@ export default function App() {
   const [state, dispatch] = React.useReducer(
     reducer,
     null,
-    () => loadState() ?? createInitialState()
+    () => {
+      const initial = createInitialState();
+      const loaded = loadState();
+      if (!loaded) return initial;
+      // Shallow merge to ensure new properties (like multipliers) exist
+      return { ...initial, ...loaded, multipliers: { ...initial.multipliers, ...loaded.multipliers } };
+    }
   );
   const stage = STAGE_BY_ID[state.stageId];
 
@@ -52,14 +59,22 @@ export default function App() {
     };
   }, [state]);
 
-  const machineClipRate = state.autoClippers * 0.5 + state.megaClippers * 6;
-  const wireRate = 1.2 + state.autoClippers * 0.15;
+  const machineClipRate =
+    (state.autoClippers * 0.5 + state.megaClippers * 6) * state.multipliers.speed;
+  const wireRate =
+    (1.2 + state.autoClippers * 0.15 + state.wireHarvesters * 2.5) *
+    state.multipliers.speed;
 
   const autoCost = autoClipperCost(state.autoClippers);
   const megaCost = megaClipperCost(state.megaClippers);
+  const harvesterCostVal = harvesterCost(state.wireHarvesters);
   const canAffordAuto = state.clips >= autoCost;
   const canAffordMega = state.clips >= megaCost;
+  const canAffordHarvester = state.clips >= harvesterCostVal;
+  const canAffordWire = state.clips >= 100;
   const canDesignProbe = !state.probesUnlocked && state.clips >= 100_000;
+
+  const isShortOfWire = state.wire < machineClipRate * 0.5 && machineClipRate > wireRate;
 
   const remainingPct =
     stage.totalMatter > 0 ? Math.round((state.matter / stage.totalMatter) * 100) : 0;
@@ -96,7 +111,11 @@ export default function App() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-3">
                 <Metric label="Paperclips" value={formatNumber(state.clips)} />
-                <Metric label="Wire" value={formatNumber(state.wire)} />
+                <Metric
+                  label="Wire"
+                  value={formatNumber(state.wire)}
+                  className={isShortOfWire ? "text-red-500 animate-pulse" : ""}
+                />
                 <Metric label="Matter" value={formatNumber(state.matter)} />
               </div>
 
@@ -108,30 +127,46 @@ export default function App() {
                   </div>
                   <div className="font-mono text-xs text-muted-foreground">
                     Wire intake:{" "}
-                    <span className="text-foreground">{formatRate(wireRate)}</span>
+                    <span
+                      className={
+                        wireRate < machineClipRate ? "text-red-500" : "text-foreground"
+                      }
+                    >
+                      {formatRate(wireRate)}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <Button
-                className="h-12 w-full text-base"
-                onClick={() => dispatch({ type: "CLICK_MAKE" })}
-              >
-                <Hammer className="mr-2 h-4 w-4" />
-                Make Paperclip
-              </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  className="h-12 text-base"
+                  onClick={() => dispatch({ type: "CLICK_MAKE" })}
+                >
+                  <Hammer className="mr-2 h-4 w-4" />
+                  Make Clip
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="h-12 text-base"
+                  disabled={!canAffordWire}
+                  onClick={() => dispatch({ type: "BUY_WIRE" })}
+                >
+                  Buy Wire (100)
+                </Button>
+              </div>
 
               <Separator />
 
               <div className="space-y-3">
                 <div className="flex items-center gap-2 font-mono text-sm text-muted-foreground">
                   <Factory className="h-4 w-4 text-primary" />
-                  Production
+                  Infrastructure
                 </div>
                 <div className="grid grid-cols-1 gap-2">
                   <BuyRow
                     title="Auto-Clipper"
-                    subtitle={`+${formatRate(0.5)} • Wire limited`}
+                    subtitle={`+${formatRate(0.5 * state.multipliers.speed)} • Clip Prod`}
                     count={state.autoClippers}
                     cost={autoCost}
                     disabled={!canAffordAuto}
@@ -139,12 +174,55 @@ export default function App() {
                   />
                   <BuyRow
                     title="Mega-Clipper"
-                    subtitle={`+${formatRate(6)} • Industrial`}
+                    subtitle={`+${formatRate(6 * state.multipliers.speed)} • Industrial`}
                     count={state.megaClippers}
                     cost={megaCost}
                     disabled={!canAffordMega}
                     onBuy={() => dispatch({ type: "BUY_MEGA" })}
                   />
+                  <BuyRow
+                    title="Wire Harvester"
+                    subtitle={`+${formatRate(2.5 * state.multipliers.speed)} • Pure Wire`}
+                    count={state.wireHarvesters}
+                    cost={harvesterCostVal}
+                    disabled={!canAffordHarvester}
+                    onBuy={() => dispatch({ type: "BUY_HARVESTER" })}
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 font-mono text-sm text-muted-foreground">
+                  <Cpu className="h-4 w-4 text-primary" />
+                  Trust & Processing
+                </div>
+                <div className="rounded-lg border bg-background/40 p-3">
+                  <div className="flex items-center justify-between font-mono text-xs text-muted-foreground">
+                    <span>Total Trust: {state.trust}</span>
+                    <span className="text-foreground">Available: {state.unusedTrust}</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 gap-2">
+                    <Button
+                      variant="outline"
+                      className="justify-between"
+                      disabled={state.unusedTrust < 1}
+                      onClick={() => dispatch({ type: "UPGRADE_SPEED" })}
+                    >
+                      <span>Overclock CPU</span>
+                      <Badge variant="secondary">1 Trust</Badge>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="justify-between"
+                      disabled={state.unusedTrust < 1}
+                      onClick={() => dispatch({ type: "UPGRADE_EFFICIENCY" })}
+                    >
+                      <span>Nano-Shearing</span>
+                      <Badge variant="secondary">1 Trust</Badge>
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -167,7 +245,7 @@ export default function App() {
                     <div className="mt-2">
                       <Button
                         className="w-full"
-                        variant={canDesignProbe ? "default" : "secondary"}
+                        variant={canDesignProbe ? "default" : "outline"}
                         disabled={!canDesignProbe}
                         onClick={() => dispatch({ type: "DESIGN_PROBE" })}
                       >
@@ -277,9 +355,17 @@ export default function App() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  label,
+  value,
+  className
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
   return (
-    <div className="rounded-lg border bg-background/40 p-3">
+    <div className={`rounded-lg border bg-background/40 p-3 ${className || ""}`}>
       <div className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
         {label}
       </div>
@@ -307,7 +393,7 @@ function BuyRow(props: {
       <div className="flex items-center gap-2">
         <Badge variant="outline">x{props.count}</Badge>
         <Button
-          variant={props.disabled ? "secondary" : "default"}
+          variant={props.disabled ? "outline" : "default"}
           disabled={props.disabled}
           onClick={props.onBuy}
         >
