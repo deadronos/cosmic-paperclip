@@ -1,3 +1,5 @@
+import type Decimal from "break_eternity.js";
+
 export type StageId = "lab" | "planetary" | "space" | "universal";
 
 export type Stage = {
@@ -17,16 +19,16 @@ export type ProbeAllocation = {
 };
 
 export type GameState = {
-  version: 1;
+  version: 2;
   stageId: StageId;
-  matter: number;
-  wire: number;
-  clips: number;
+  matter: Decimal;
+  wire: Decimal;
+  clips: Decimal;
   autoClippers: number;
   megaClippers: number;
   wireHarvesters: number;
   probesUnlocked: boolean;
-  probes: number;
+  probes: Decimal;
   allocation: ProbeAllocation;
   trust: number;
   unusedTrust: number;

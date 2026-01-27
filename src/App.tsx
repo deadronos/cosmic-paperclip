@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Cpu, Factory, Hammer, RotateCcw, Satellite } from "lucide-react";
+import Decimal from "break_eternity.js";
 
 import Ticker from "@/components/Ticker";
 import UniverseVisualizer from "@/components/UniverseVisualizer";
@@ -32,6 +33,10 @@ export default function App() {
       return { ...initial, ...loaded, multipliers: { ...initial.multipliers, ...loaded.multipliers } };
     }
   );
+  const stateRef = React.useRef(state);
+  React.useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
   const stage = STAGE_BY_ID[state.stageId];
 
   React.useEffect(() => {
@@ -48,36 +53,41 @@ export default function App() {
   }, []);
 
   React.useEffect(() => {
-    const id = window.setInterval(() => saveState(state), 4_000);
+    const id = window.setInterval(() => saveState(stateRef.current), 4_000);
     const onVis = () => {
-      if (document.visibilityState === "hidden") saveState(state);
+      if (document.visibilityState === "hidden") saveState(stateRef.current);
     };
     window.addEventListener("visibilitychange", onVis);
     return () => {
       window.clearInterval(id);
       window.removeEventListener("visibilitychange", onVis);
     };
-  }, [state]);
+  }, []);
 
-  const machineClipRate =
-    (state.autoClippers * 0.5 + state.megaClippers * 6) * state.multipliers.speed;
-  const wireRate =
-    (1.2 + state.autoClippers * 0.15 + state.wireHarvesters * 2.5) *
-    state.multipliers.speed;
+  const machineClipRate = Decimal.mul(state.autoClippers, 0.5)
+    .plus(Decimal.mul(state.megaClippers, 6))
+    .times(state.multipliers.speed);
+  const wireRate = Decimal.mul(state.autoClippers, 0.15)
+    .plus(1.2)
+    .plus(Decimal.mul(state.wireHarvesters, 2.5))
+    .times(state.multipliers.speed);
 
   const autoCost = autoClipperCost(state.autoClippers);
   const megaCost = megaClipperCost(state.megaClippers);
   const harvesterCostVal = harvesterCost(state.wireHarvesters);
-  const canAffordAuto = state.clips >= autoCost;
-  const canAffordMega = state.clips >= megaCost;
-  const canAffordHarvester = state.clips >= harvesterCostVal;
-  const canAffordWire = state.clips >= 100;
-  const canDesignProbe = !state.probesUnlocked && state.clips >= 100_000;
+  const canAffordAuto = state.clips.gte(autoCost);
+  const canAffordMega = state.clips.gte(megaCost);
+  const canAffordHarvester = state.clips.gte(harvesterCostVal);
+  const canAffordWire = state.clips.gte(100);
+  const canDesignProbe = !state.probesUnlocked && state.clips.gte(100_000);
 
-  const isShortOfWire = state.wire < machineClipRate * 0.5 && machineClipRate > wireRate;
+  const isShortOfWire =
+    state.wire.lt(machineClipRate.times(0.5)) && machineClipRate.gt(wireRate);
 
   const remainingPct =
-    stage.totalMatter > 0 ? Math.round((state.matter / stage.totalMatter) * 100) : 0;
+    stage.totalMatter > 0
+      ? Math.round(state.matter.div(stage.totalMatter).times(100).toNumber())
+      : 0;
 
   return (
     <div className="min-h-dvh bg-background">
@@ -129,7 +139,7 @@ export default function App() {
                     Wire intake:{" "}
                     <span
                       className={
-                        wireRate < machineClipRate ? "text-red-500" : "text-foreground"
+                        wireRate.lt(machineClipRate) ? "text-red-500" : "text-foreground"
                       }
                     >
                       {formatRate(wireRate)}
@@ -322,7 +332,7 @@ export default function App() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[520px]">
+              <div className="h-130">
                 <UniverseVisualizer
                   stageId={state.stageId}
                   matterRemaining={state.matter}
@@ -378,7 +388,7 @@ function BuyRow(props: {
   title: string;
   subtitle: string;
   count: number;
-  cost: number;
+  cost: Decimal;
   disabled: boolean;
   onBuy: () => void;
 }) {

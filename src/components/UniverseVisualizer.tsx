@@ -1,11 +1,12 @@
 import * as React from "react";
 import { STAGE_BY_ID } from "@/game/constants";
 import type { StageId } from "@/game/types";
+import type Decimal from "break_eternity.js";
 import { cn } from "@/lib/utils";
 
 type Props = {
   stageId: StageId;
-  matterRemaining: number;
+  matterRemaining: Decimal;
   className?: string;
 };
 
@@ -16,6 +17,14 @@ export default function UniverseVisualizer({ stageId, matterRemaining, className
   const stateRef = React.useRef<{ stageId: StageId; dots: Dot[]; onCount: number } | null>(
     null
   );
+  const inputsRef = React.useRef<{ stageId: StageId; matterRemaining: Decimal }>({
+    stageId,
+    matterRemaining
+  });
+
+  React.useEffect(() => {
+    inputsRef.current = { stageId, matterRemaining };
+  }, [stageId, matterRemaining]);
 
   React.useEffect(() => {
     const canvas = canvasRef.current;
@@ -39,7 +48,8 @@ export default function UniverseVisualizer({ stageId, matterRemaining, className
 
     const loop = () => {
       raf = window.requestAnimationFrame(loop);
-      draw(ctx, canvas, stageId, matterRemaining, stateRef);
+      const { stageId: sId, matterRemaining: m } = inputsRef.current;
+      draw(ctx, canvas, sId, m, stateRef);
     };
     raf = window.requestAnimationFrame(loop);
 
@@ -47,7 +57,7 @@ export default function UniverseVisualizer({ stageId, matterRemaining, className
       window.cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
     };
-  }, [stageId, matterRemaining]);
+  }, []);
 
   return (
     <div className={cn("relative overflow-hidden rounded-lg border bg-card", className)}>
@@ -67,11 +77,15 @@ function draw(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   stageId: StageId,
-  matterRemaining: number,
+  matterRemaining: Decimal,
   stateRef: React.MutableRefObject<{ stageId: StageId; dots: Dot[]; onCount: number } | null>
 ) {
   const stage = STAGE_BY_ID[stageId];
-  const consumed = stage.totalMatter <= 0 ? 1 : 1 - matterRemaining / stage.totalMatter;
+  const remainingFrac =
+    stage.totalMatter <= 0
+      ? 0
+      : Math.max(0, Math.min(1, matterRemaining.div(stage.totalMatter).toNumber()));
+  const consumed = 1 - remainingFrac;
   const w = canvas.getBoundingClientRect().width;
   const h = canvas.getBoundingClientRect().height;
 

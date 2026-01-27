@@ -1,5 +1,6 @@
 import type { GameState, StageId } from "@/game/types";
 import { STAGE_BY_ID } from "@/game/constants";
+import Decimal from "break_eternity.js";
 
 export function pushNews(state: GameState, message: string): GameState {
   const next = [message, ...state.news].slice(0, 32);
@@ -8,7 +9,13 @@ export function pushNews(state: GameState, message: string): GameState {
 
 export function maybeEmitMilestones(state: GameState): GameState {
   const stage = STAGE_BY_ID[state.stageId];
-  const remainingFrac = stage.totalMatter <= 0 ? 0 : state.matter / stage.totalMatter;
+  const remainingFrac =
+    stage.totalMatter <= 0
+      ? 0
+      : Math.max(
+          0,
+          Math.min(1, Decimal.fromValue_noAlloc(state.matter).div(stage.totalMatter).toNumber())
+        );
   const flags = state.milestoneFlags[state.stageId] ?? {
     half: false,
     ten: false,
