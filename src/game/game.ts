@@ -1,5 +1,6 @@
 import { COSTS, RATES, STAGES, STAGE_BY_ID } from "@/game/constants";
 import { normalizeAllocation } from "@/game/allocation";
+import { getWireRate, getMachineClipRate } from "@/game/selectors";
 import { maybeEmitMilestones, pushNews } from "@/game/news";
 import Decimal from "break_eternity.js";
 import type { GameState, ProbeAllocation, StageId } from "@/game/types";
@@ -162,11 +163,7 @@ function tick(state: GameState, dt: number): GameState {
   const stage = STAGE_BY_ID[state.stageId];
   let next = state;
 
-  const wireRate =
-    Decimal.mul(state.autoClippers, RATES.wirePerSecondPerAutoClipper)
-      .plus(RATES.wirePerSecondBase)
-      .plus(Decimal.mul(state.wireHarvesters, RATES.wirePerSecondPerHarvester))
-      .times(next.multipliers.speed);
+  const wireRate = getWireRate(next);
   const wireGained = Decimal.min(next.matter, wireRate.times(dt));
   next = {
     ...next,
@@ -174,10 +171,7 @@ function tick(state: GameState, dt: number): GameState {
     wire: next.wire.plus(wireGained)
   };
 
-  const machineClipRate =
-    Decimal.mul(state.autoClippers, RATES.clipsPerSecondPerAutoClipper)
-      .plus(Decimal.mul(state.megaClippers, RATES.clipsPerSecondPerMegaClipper))
-      .times(next.multipliers.speed);
+  const machineClipRate = getMachineClipRate(next);
   const clipsWanted = machineClipRate.times(dt);
   const clipsMade = Decimal.min(next.wire.div(next.multipliers.efficiency), clipsWanted);
   next = {
