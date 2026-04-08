@@ -1,16 +1,18 @@
 import * as React from "react";
 import { Cpu, Factory, Hammer, RotateCcw, Satellite } from "lucide-react";
-import Decimal from "break_eternity.js";
 
 import Ticker from "@/components/Ticker";
 import UniverseVisualizer from "@/components/UniverseVisualizer";
+import Metric from "@/components/Metric";
+import BuyRow from "@/components/BuyRow";
+import AllocationRow from "@/components/AllocationRow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
 import { setAllocationAxis } from "@/game/allocation";
-import { STAGE_BY_ID } from "@/game/constants";
+import { COSTS, RATES, STAGE_BY_ID } from "@/game/constants";
+import { getWireRate, getMachineClipRate } from "@/game/selectors";
 import { formatNumber, formatRate } from "@/game/format";
 import {
   autoClipperCost,
@@ -64,13 +66,8 @@ export default function App() {
     };
   }, []);
 
-  const machineClipRate = Decimal.mul(state.autoClippers, 0.5)
-    .plus(Decimal.mul(state.megaClippers, 6))
-    .times(state.multipliers.speed);
-  const wireRate = Decimal.mul(state.autoClippers, 0.15)
-    .plus(1.2)
-    .plus(Decimal.mul(state.wireHarvesters, 2.5))
-    .times(state.multipliers.speed);
+  const machineClipRate = getMachineClipRate(state);
+  const wireRate = getWireRate(state);
 
   const autoCost = autoClipperCost(state.autoClippers);
   const megaCost = megaClipperCost(state.megaClippers);
@@ -78,8 +75,8 @@ export default function App() {
   const canAffordAuto = state.clips.gte(autoCost);
   const canAffordMega = state.clips.gte(megaCost);
   const canAffordHarvester = state.clips.gte(harvesterCostVal);
-  const canAffordWire = state.clips.gte(100);
-  const canDesignProbe = !state.probesUnlocked && state.clips.gte(100_000);
+  const canAffordWire = state.clips.gte(COSTS.wirePurchase.clips);
+  const canDesignProbe = !state.probesUnlocked && state.clips.gte(COSTS.probeDesign.cost);
 
   const isShortOfWire =
     state.wire.lt(machineClipRate.times(0.5)) && machineClipRate.gt(wireRate);
@@ -162,7 +159,7 @@ export default function App() {
                   disabled={!canAffordWire}
                   onClick={() => dispatch({ type: "BUY_WIRE" })}
                 >
-                  Buy Wire (100)
+                  {`Buy Wire (${COSTS.wirePurchase.amount})`}
                 </Button>
               </div>
 
@@ -176,7 +173,7 @@ export default function App() {
                 <div className="grid grid-cols-1 gap-2">
                   <BuyRow
                     title="Auto-Clipper"
-                    subtitle={`+${formatRate(0.5 * state.multipliers.speed)} • Clip Prod`}
+                    subtitle={`+${formatRate(RATES.clipsPerSecondPerAutoClipper * state.multipliers.speed)} • Clip Prod`}
                     count={state.autoClippers}
                     cost={autoCost}
                     disabled={!canAffordAuto}
@@ -184,7 +181,7 @@ export default function App() {
                   />
                   <BuyRow
                     title="Mega-Clipper"
-                    subtitle={`+${formatRate(6 * state.multipliers.speed)} • Industrial`}
+                    subtitle={`+${formatRate(RATES.clipsPerSecondPerMegaClipper * state.multipliers.speed)} • Industrial`}
                     count={state.megaClippers}
                     cost={megaCost}
                     disabled={!canAffordMega}
@@ -192,7 +189,7 @@ export default function App() {
                   />
                   <BuyRow
                     title="Wire Harvester"
-                    subtitle={`+${formatRate(2.5 * state.multipliers.speed)} • Pure Wire`}
+                    subtitle={`+${formatRate(RATES.wirePerSecondPerHarvester * state.multipliers.speed)} • Pure Wire`}
                     count={state.wireHarvesters}
                     cost={harvesterCostVal}
                     disabled={!canAffordHarvester}
@@ -249,7 +246,7 @@ export default function App() {
                     <div className="font-mono text-xs text-muted-foreground">
                       Design cost:{" "}
                       <span className="text-foreground">
-                        {formatNumber(100_000)} clips
+                        {formatNumber(COSTS.probeDesign.cost)} clips
                       </span>
                     </div>
                     <div className="mt-2">
@@ -365,73 +362,4 @@ export default function App() {
   );
 }
 
-function Metric({
-  label,
-  value,
-  className
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div className={`rounded-lg border bg-background/40 p-3 ${className || ""}`}>
-      <div className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
-      <div className="mt-1 font-mono text-lg text-foreground">{value}</div>
-    </div>
-  );
-}
-
-function BuyRow(props: {
-  title: string;
-  subtitle: string;
-  count: number;
-  cost: Decimal;
-  disabled: boolean;
-  onBuy: () => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border bg-background/40 p-3">
-      <div>
-        <div className="font-mono text-sm">{props.title}</div>
-        <div className="mt-0.5 font-mono text-xs text-muted-foreground">
-          {props.subtitle}
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        <Badge variant="outline">x{props.count}</Badge>
-        <Button
-          variant={props.disabled ? "outline" : "default"}
-          disabled={props.disabled}
-          onClick={props.onBuy}
-        >
-          Buy {formatNumber(props.cost)}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function AllocationRow(props: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="font-mono text-xs text-muted-foreground">{props.label}</div>
-        <Badge variant="outline">{props.value}%</Badge>
-      </div>
-      <Slider
-        value={[props.value]}
-        max={100}
-        step={1}
-        onValueChange={(v) => props.onChange(v[0] ?? 0)}
-      />
-    </div>
-  );
-}
 
