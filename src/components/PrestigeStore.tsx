@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { formatNumber } from "@/game/format";
 import { PRESTIGE_UPGRADES } from "@/game/constants";
 import { getPrestigeUpgradeCost, calculatePotentialFlux } from "@/game/game";
-import type { GameState, GameAction } from "@/game/types";
+import type { GameAction } from "@/game/game";
+import type { GameState } from "@/game/types";
 
 interface PrestigeStoreProps {
   state: GameState;
