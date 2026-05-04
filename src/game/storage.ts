@@ -1,9 +1,10 @@
 import Decimal from "break_eternity.js";
 import { createInitialState } from "@/game/game";
-import type { GameState, StageId, ProbeAllocation } from "@/game/types";
+import type { GameState, StageId, ProbeAllocation, PrestigeUpgradeId } from "@/game/types";
 
 const KEY_V1 = "cosmic-paperclip:save:v1";
 const KEY_V2 = "cosmic-paperclip:save:v2";
+const KEY_V3 = "cosmic-paperclip:save:v3";
 
 type SavedStateV1 = {
   version: 1;
@@ -43,26 +44,47 @@ type SavedStateV2 = {
   milestoneFlags: Record<string, { half: boolean; ten: boolean; one: boolean }>;
 };
 
+type SavedStateV3 = Omit<SavedStateV2, "version"> & {
+  version: 3;
+  quantumFlux: string;
+  prestigeUpgrades: Record<PrestigeUpgradeId, number>;
+  timesPrestiged: number;
+};
+
 export function loadState(): GameState | null {
   try {
+    const rawV3 = localStorage.getItem(KEY_V3);
+    if (rawV3) {
+      const parsed = JSON.parse(rawV3) as unknown;
+      if (isSavedStateV3(parsed)) return hydrateV3(parsed);
+    }
+
     const rawV2 = localStorage.getItem(KEY_V2);
     if (rawV2) {
       const parsed = JSON.parse(rawV2) as unknown;
-      if (isSavedStateV2(parsed)) return hydrateV2(parsed);
+      if (isSavedStateV2(parsed)) {
+        const migrated = migrateV2ToV3(parsed);
+        try {
+          localStorage.setItem(KEY_V3, JSON.stringify(migrated));
+        } catch {
+          // ignore
+        }
+        return hydrateV3(migrated);
+      }
     }
 
     const rawV1 = localStorage.getItem(KEY_V1);
     if (rawV1) {
       const parsed = JSON.parse(rawV1) as unknown;
       if (isSavedStateV1(parsed)) {
-        const migrated = migrateV1ToV2(parsed);
-        // Best-effort: write migrated save forward.
+        const migratedToV2 = migrateV1ToV2(parsed);
+        const migratedToV3 = migrateV2ToV3(migratedToV2);
         try {
-          localStorage.setItem(KEY_V2, JSON.stringify(migrated));
+          localStorage.setItem(KEY_V3, JSON.stringify(migratedToV3));
         } catch {
           // ignore
         }
-        return hydrateV2(migrated);
+        return hydrateV3(migratedToV3);
       }
     }
 
@@ -74,7 +96,7 @@ export function loadState(): GameState | null {
 
 export function saveState(state: GameState) {
   try {
-    localStorage.setItem(KEY_V2, JSON.stringify(dehydrateV2(state)));
+    localStorage.setItem(KEY_V3, JSON.stringify(dehydrateV3(state)));
   } catch {
     // ignore
   }
@@ -84,14 +106,15 @@ export function clearSave() {
   try {
     localStorage.removeItem(KEY_V1);
     localStorage.removeItem(KEY_V2);
+    localStorage.removeItem(KEY_V3);
   } catch {
     // ignore
   }
 }
 
-function dehydrateV2(state: GameState): SavedStateV2 {
+function dehydrateV3(state: GameState): SavedStateV3 {
   return {
-    version: 2,
+    version: 3,
     stageId: state.stageId,
     matter: state.matter.toString(),
     wire: state.wire.toString(),
@@ -106,16 +129,19 @@ function dehydrateV2(state: GameState): SavedStateV2 {
     unusedTrust: state.unusedTrust,
     multipliers: state.multipliers,
     news: state.news,
-    milestoneFlags: state.milestoneFlags
+    milestoneFlags: state.milestoneFlags,
+    quantumFlux: state.quantumFlux.toString(),
+    prestigeUpgrades: state.prestigeUpgrades,
+    timesPrestiged: state.timesPrestiged,
   };
 }
 
-function hydrateV2(saved: SavedStateV2): GameState {
+function hydrateV3(saved: SavedStateV3): GameState {
   const initial = createInitialState();
   return {
     ...initial,
     ...saved,
-    version: 2,
+    version: 3,
     multipliers: { ...initial.multipliers, ...saved.multipliers },
     allocation: saved.allocation ?? initial.allocation,
     news: Array.isArray(saved.news) ? saved.news : initial.news,
@@ -123,7 +149,24 @@ function hydrateV2(saved: SavedStateV2): GameState {
     matter: new Decimal(saved.matter),
     wire: new Decimal(saved.wire),
     clips: new Decimal(saved.clips),
-    probes: new Decimal(saved.probes)
+    probes: new Decimal(saved.probes),
+    quantumFlux: new Decimal(saved.quantumFlux),
+    prestigeUpgrades: saved.prestigeUpgrades ?? initial.prestigeUpgrades,
+  };
+}
+
+function migrateV2ToV3(saved: SavedStateV2): SavedStateV3 {
+  return {
+    ...saved,
+    version: 3,
+    quantumFlux: "0",
+    prestigeUpgrades: {
+      autoWire: 0,
+      globalMultiplier: 0,
+      probeCost: 0,
+      trustBonus: 0
+    },
+    timesPrestiged: 0
   };
 }
 
@@ -189,6 +232,33 @@ function isSavedStateV2(v: unknown): v is SavedStateV2 {
     Array.isArray(s.news) &&
     typeof mult.speed === "number" &&
     typeof mult.efficiency === "number"
+  );
+}
+
+function isSavedStateV3(v: unknown): v is SavedStateV3 {
+  if (!v || typeof v !== "object") return false;
+  const s = v as Partial<SavedStateV3>;
+  const multUnknown = (s as { multipliers?: unknown }).multipliers;
+  if (!multUnknown || typeof multUnknown !== "object") return false;
+  const mult = multUnknown as { speed?: unknown; efficiency?: unknown };
+  return (
+    s.version === 3 &&
+    typeof s.stageId === "string" &&
+    typeof s.matter === "string" &&
+    typeof s.wire === "string" &&
+    typeof s.clips === "string" &&
+    typeof s.autoClippers === "number" &&
+    typeof s.megaClippers === "number" &&
+    typeof s.wireHarvesters === "number" &&
+    typeof s.probesUnlocked === "boolean" &&
+    typeof s.probes === "string" &&
+    typeof s.allocation === "object" &&
+    Array.isArray(s.news) &&
+    typeof mult.speed === "number" &&
+    typeof mult.efficiency === "number" &&
+    typeof s.quantumFlux === "string" &&
+    typeof s.prestigeUpgrades === "object" &&
+    typeof s.timesPrestiged === "number"
   );
 }
 

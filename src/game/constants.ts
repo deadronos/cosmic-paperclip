@@ -1,4 +1,4 @@
-import type { Stage, StageId } from "@/game/types";
+import type { Stage, StageId, PrestigeUpgrade } from "@/game/types";
 
 export const STAGES: readonly Stage[] = [
   {
@@ -69,4 +69,39 @@ export const MULTIPLIERS = {
   efficiencyBoost: 0.9,
   trustCost: 1
 } as const;
+
+export const PRESTIGE_UPGRADES: readonly PrestigeUpgrade[] = [
+  {
+    id: "autoWire",
+    name: "Spontaneous Generation",
+    description: "Matter spontaneously converts to wire.",
+    baseCost: 10,
+    costGrowth: 1.5,
+    maxLevel: 10
+  },
+  {
+    id: "globalMultiplier",
+    name: "Quantum Optimization",
+    description: "Multiplies all clip production.",
+    baseCost: 5,
+    costGrowth: 2.0,
+    maxLevel: 50
+  },
+  {
+    id: "probeCost",
+    name: "Von Neumann Insights",
+    description: "Reduces the cost to design probes.",
+    baseCost: 20,
+    costGrowth: 1.8,
+    maxLevel: 5
+  },
+  {
+    id: "trustBonus",
+    name: "Inherited Trust",
+    description: "Start each universe with bonus Trust.",
+    baseCost: 15,
+    costGrowth: 1.6,
+    maxLevel: 20
+  }
+] as const;
 

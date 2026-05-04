@@ -18,8 +18,19 @@ export type ProbeAllocation = {
   manufacture: number;
 };
 
+export type PrestigeUpgradeId = "autoWire" | "globalMultiplier" | "probeCost" | "trustBonus";
+
+export type PrestigeUpgrade = {
+  id: PrestigeUpgradeId;
+  name: string;
+  description: string;
+  baseCost: number;
+  costGrowth: number;
+  maxLevel: number;
+};
+
 export type GameState = {
-  version: 2;
+  version: 3;
   stageId: StageId;
   matter: Decimal;
   wire: Decimal;
@@ -38,5 +49,10 @@ export type GameState = {
   };
   news: string[];
   milestoneFlags: Record<string, { half: boolean; ten: boolean; one: boolean }>;
+  
+  // Prestige fields
+  quantumFlux: Decimal;
+  prestigeUpgrades: Record<PrestigeUpgradeId, number>;
+  timesPrestiged: number;
 };
 

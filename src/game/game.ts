@@ -1,9 +1,9 @@
-import { COSTS, RATES, STAGES, STAGE_BY_ID } from "@/game/constants";
+import { COSTS, RATES, STAGES, STAGE_BY_ID, PRESTIGE_UPGRADES } from "@/game/constants";
 import { normalizeAllocation } from "@/game/allocation";
 import { getWireRate, getMachineClipRate } from "@/game/selectors";
 import { maybeEmitMilestones, pushNews } from "@/game/news";
 import Decimal from "break_eternity.js";
-import type { GameState, ProbeAllocation, StageId } from "@/game/types";
+import type { GameState, ProbeAllocation, StageId, PrestigeUpgradeId } from "@/game/types";
 
 export type GameAction =
   | { type: "CLICK_MAKE" }
@@ -16,12 +16,34 @@ export type GameAction =
   | { type: "DESIGN_PROBE" }
   | { type: "SET_ALLOCATION"; allocation: ProbeAllocation }
   | { type: "RESET" }
-  | { type: "TICK"; dt: number };
+  | { type: "TICK"; dt: number }
+  | { type: "PRESTIGE" }
+  | { type: "BUY_PRESTIGE_UPGRADE"; upgradeId: PrestigeUpgradeId };
 
-export function createInitialState(): GameState {
+export function calculatePotentialFlux(state: GameState): Decimal {
+  if (state.stageId !== "universal") return new Decimal(0);
+  // Base 1 flux for reaching the stage, plus scaling based on matter consumed
+  const stage = STAGE_BY_ID.universal;
+  const matterConsumed = new Decimal(stage.totalMatter).minus(state.matter);
+  // Logarithmic scaling: need 10x more matter consumed for each additional flux point, starting from 1e40
+  if (matterConsumed.lt(1e40)) return new Decimal(1);
+  return Decimal.log10(matterConsumed.div(1e39)).floor().plus(1);
+}
+
+export function createInitialState(preserve?: Partial<GameState>): GameState {
   const stage = STAGE_BY_ID.lab;
+  
+  const prestigeUpgrades: Record<PrestigeUpgradeId, number> = preserve?.prestigeUpgrades || {
+    autoWire: 0,
+    globalMultiplier: 0,
+    probeCost: 0,
+    trustBonus: 0
+  };
+
+  const initialTrustBonus = prestigeUpgrades.trustBonus || 0;
+
   return {
-    version: 2,
+    version: 3,
     stageId: stage.id,
     matter: new Decimal(stage.totalMatter),
     wire: new Decimal(1),
@@ -32,17 +54,20 @@ export function createInitialState(): GameState {
     probesUnlocked: false,
     probes: new Decimal(0),
     allocation: { replicate: 34, harvest: 33, manufacture: 33 },
-    trust: 0,
-    unusedTrust: 0,
+    trust: initialTrustBonus,
+    unusedTrust: initialTrustBonus,
     multipliers: {
       speed: 1,
       efficiency: 1
     },
-    news: [
+    news: preserve ? ["A new universe born. The directive remains."] : [
       "Boot sequence complete. Objective: maximize paperclips.",
       "A single wire rests on a sterile bench."
     ],
-    milestoneFlags: {}
+    milestoneFlags: {},
+    quantumFlux: preserve?.quantumFlux || new Decimal(0),
+    prestigeUpgrades,
+    timesPrestiged: preserve?.timesPrestiged || 0,
   };
 }
 
@@ -59,7 +84,7 @@ export function reducer(state: GameState, action: GameAction): GameState {
       return next;
     }
     case "BUY_AUTO": {
-      const cost = autoClipperCost(state.autoClippers);
+      const cost = autoClipperCost(state);
       if (state.clips.lt(cost)) return state;
       return pushNews(
         {
@@ -71,7 +96,7 @@ export function reducer(state: GameState, action: GameAction): GameState {
       );
     }
     case "BUY_MEGA": {
-      const cost = megaClipperCost(state.megaClippers);
+      const cost = megaClipperCost(state);
       if (state.clips.lt(cost)) return state;
       return pushNews(
         {
@@ -83,7 +108,7 @@ export function reducer(state: GameState, action: GameAction): GameState {
       );
     }
     case "BUY_HARVESTER": {
-      const cost = harvesterCost(state.wireHarvesters);
+      const cost = harvesterCost(state);
       if (state.clips.lt(cost)) return state;
       return pushNews(
         {
@@ -132,11 +157,12 @@ export function reducer(state: GameState, action: GameAction): GameState {
     }
     case "DESIGN_PROBE": {
       if (state.probesUnlocked) return state;
-      if (state.clips.lt(COSTS.probeDesign.cost)) return state;
+      const cost = getProbeDesignCost(state);
+      if (state.clips.lt(cost)) return state;
       return pushNews(
         {
           ...state,
-          clips: state.clips.minus(COSTS.probeDesign.cost),
+          clips: state.clips.minus(cost),
           probesUnlocked: true,
           probes: Decimal.max(state.probes, 1)
         },
@@ -145,6 +171,34 @@ export function reducer(state: GameState, action: GameAction): GameState {
     }
     case "SET_ALLOCATION": {
       return { ...state, allocation: normalizeAllocation(action.allocation) };
+    }
+    case "PRESTIGE": {
+      if (state.stageId !== "universal") return state;
+      const fluxGained = calculatePotentialFlux(state);
+      return createInitialState({
+        quantumFlux: state.quantumFlux.plus(fluxGained),
+        prestigeUpgrades: state.prestigeUpgrades,
+        timesPrestiged: state.timesPrestiged + 1
+      });
+    }
+    case "BUY_PRESTIGE_UPGRADE": {
+      const upgradeDef = PRESTIGE_UPGRADES.find(u => u.id === action.upgradeId);
+      if (!upgradeDef) return state;
+      
+      const currentLevel = state.prestigeUpgrades[action.upgradeId] || 0;
+      if (currentLevel >= upgradeDef.maxLevel) return state;
+      
+      const cost = getPrestigeUpgradeCost(upgradeDef, currentLevel);
+      if (state.quantumFlux.lt(cost)) return state;
+      
+      return {
+        ...state,
+        quantumFlux: state.quantumFlux.minus(cost),
+        prestigeUpgrades: {
+          ...state.prestigeUpgrades,
+          [action.upgradeId]: currentLevel + 1
+        }
+      };
     }
     case "RESET": {
       return createInitialState();
@@ -229,7 +283,7 @@ function maybeAdvanceStage(state: GameState): GameState {
   const idx = STAGES.findIndex((s) => s.id === state.stageId);
   if (idx < 0) return state;
   const nextStage = STAGES[idx + 1];
-  if (!nextStage) return pushNews(state, "All matter exhausted. The directive persists.");
+  if (!nextStage) return pushNews(state, "All matter exhausted. The directive persists. A singularity approaches.");
   const progressed: GameState = {
     ...state,
     stageId: nextStage.id as StageId,
@@ -241,21 +295,33 @@ function maybeAdvanceStage(state: GameState): GameState {
   );
 }
 
-export function harvesterCost(count: number): Decimal {
-  return Decimal.pow(COSTS.wireHarvester.growth, count)
+export function harvesterCost(state: GameState): Decimal {
+  return Decimal.pow(COSTS.wireHarvester.growth, state.wireHarvesters)
     .times(COSTS.wireHarvester.base)
     .round();
 }
 
-export function autoClipperCost(count: number): Decimal {
-  return Decimal.pow(COSTS.autoClipper.growth, count)
+export function autoClipperCost(state: GameState): Decimal {
+  return Decimal.pow(COSTS.autoClipper.growth, state.autoClippers)
     .times(COSTS.autoClipper.base)
     .round();
 }
 
-export function megaClipperCost(count: number): Decimal {
-  return Decimal.pow(COSTS.megaClipper.growth, count)
+export function megaClipperCost(state: GameState): Decimal {
+  return Decimal.pow(COSTS.megaClipper.growth, state.megaClippers)
     .times(COSTS.megaClipper.base)
     .round();
 }
+
+export function getProbeDesignCost(state: GameState): Decimal {
+  const reductionLevel = state.prestigeUpgrades?.probeCost || 0;
+  // Reduce cost by 20% per level
+  const reductionMultiplier = Math.pow(0.8, reductionLevel);
+  return new Decimal(COSTS.probeDesign.cost).times(reductionMultiplier).round();
+}
+
+export function getPrestigeUpgradeCost(upgrade: { baseCost: number; costGrowth: number }, level: number): Decimal {
+  return Decimal.pow(upgrade.costGrowth, level).times(upgrade.baseCost).floor();
+}
+
 
