@@ -1,0 +1,31 @@
+<h2>Smooth Number Transitions</h2>
+<p class="subtitle">Choose an animation style for the counters, rates, and progress elements</p>
+
+<div class="options">
+  <div class="option" data-choice="ease-out" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Ease-Out (Recommended)</h3>
+      <p>Fast start, gentle finish. Numbers catch up quickly then settle. Feels responsive and natural.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="linear" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Linear</h3>
+      <p>Constant speed throughout. Predictable but can feel robotic.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="spring" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Spring Physics</h3>
+      <p>Overshoots slightly then settles. More playful, might be distracting for serious UI.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 2rem;">
+  <p class="label">Duration</p>
+  <p>All animations should complete within <strong>300–500ms</strong>. Numbers that are closer should animate faster than numbers that are far apart.</p>
+</div>
