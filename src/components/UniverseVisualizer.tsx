@@ -202,6 +202,36 @@ function draw(
     ctx.fillRect(d.x, d.y, 2, 2);
   }
 
+  const probeCount = Math.min(50, Math.ceil(probes.div(10).toNumber()));
+  s.probes = ensureProbes(probeCount, w, h, s.probes, probesUnlocked);
+  updateProbeEntities(s.probes, w, h, elapsed);
+
+  if (probesUnlocked && probes.gt(0)) {
+    const color = probeColor(allocation);
+    for (const e of s.probes) {
+      for (let i = 0; i < e.trail.length; i++) {
+        const t = e.trail[i];
+        const trailAlpha = ((i + 1) / e.trail.length) * 0.3;
+        ctx.fillStyle = color.replace("0.9", trailAlpha.toFixed(2));
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = color.replace("0.9", "0.15");
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = color.replace("0.9", "0.25");
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   ctx.strokeStyle = "rgba(255,155,70,0.12)";
   ctx.strokeRect(8, 8, w - 16, h - 16);
 }
@@ -238,5 +268,69 @@ function createParticles(count: number, w: number, h: number): Particle[] {
     });
   }
   return particles;
+}
+
+function probeColor(allocation: ProbeAllocation): string {
+  if (allocation.replicate > 50) return "rgba(100,200,255,0.9)";
+  if (allocation.harvest > 50) return "rgba(100,255,100,0.9)";
+  if (allocation.manufacture > 50) return "rgba(255,200,50,0.9)";
+  return "rgba(200,200,220,0.9)";
+}
+
+function ensureProbes(
+  desired: number,
+  w: number,
+  h: number,
+  current: ProbeEntity[],
+  probesUnlocked: boolean
+): ProbeEntity[] {
+  const pad = 18;
+  if (!probesUnlocked || desired <= 0) return [];
+
+  let entities = current;
+  while (entities.length < desired) {
+    entities.push({
+      x: pad + Math.random() * Math.max(1, w - pad * 2),
+      y: pad + Math.random() * Math.max(1, h - pad * 2),
+      vx: (Math.random() - 0.5) * 0.6,
+      vy: (Math.random() - 0.5) * 0.6,
+      trail: [],
+      trailLen: 3 + Math.floor(Math.random() * 3)
+    });
+  }
+  if (entities.length > desired) {
+    entities = entities.slice(0, desired);
+  }
+  return entities;
+}
+
+function updateProbeEntities(
+  entities: ProbeEntity[],
+  w: number,
+  h: number,
+  elapsed: number
+): void {
+  const pad = 18;
+  for (const e of entities) {
+    e.vx += (Math.random() - 0.5) * 0.04;
+    e.vy += (Math.random() - 0.5) * 0.04;
+    const maxSpeed = 0.8;
+    const speed = Math.sqrt(e.vx * e.vx + e.vy * e.vy);
+    if (speed > maxSpeed) {
+      e.vx = (e.vx / speed) * maxSpeed;
+      e.vy = (e.vy / speed) * maxSpeed;
+    }
+
+    e.x += e.vx;
+    e.y += e.vy;
+
+    if (e.x < pad) { e.x = pad; e.vx *= -1; }
+    if (e.x > w - pad) { e.x = w - pad; e.vx *= -1; }
+    if (e.y < pad) { e.y = pad; e.vy *= -1; }
+    if (e.y > h - pad) { e.y = h - pad; e.vy *= -1; }
+
+    e.trail.push({ x: e.x, y: e.y });
+    if (e.trail.length > e.trailLen) e.trail.shift();
+  }
 }
 
