@@ -108,7 +108,19 @@ export default function UniverseVisualizer({
       <div className="pointer-events-none absolute inset-x-0 bottom-0 border-t bg-background/40 px-4 py-2 backdrop-blur">
         <div className="flex items-center justify-between font-mono text-xs text-muted-foreground">
           <span>Universe Visualizer</span>
-          <span>Signal: nominal</span>
+          <span className="flex items-center gap-1">
+            {(() => {
+              if (!probesUnlocked) return "Signal: idle";
+              if (probesProp?.eq(0) ?? true) return "Signal: waiting";
+              return (
+                <>
+                  <span>Probes: {Math.floor(probesProp.toNumber())}</span>
+                  <span className="mx-1">|</span>
+                  <span className="text-green-400 animate-pulse">Signal: active</span>
+                </>
+              );
+            })()}
+          </span>
         </div>
       </div>
     </div>
