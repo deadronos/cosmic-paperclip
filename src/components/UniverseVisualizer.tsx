@@ -1,6 +1,6 @@
 import * as React from "react";
 import { STAGE_BY_ID } from "@/game/constants";
-import type { StageId } from "@/game/types";
+import type { StageId, ProbeAllocation } from "@/game/types";
 import type Decimal from "break_eternity.js";
 import { cn } from "@/lib/utils";
 import { useAnimatedNumber } from "@/hooks";
@@ -9,15 +9,33 @@ type Props = {
   stageId: StageId;
   matterRemaining: Decimal;
   className?: string;
+  probes?: Decimal;
+  probesUnlocked?: boolean;
+  allocation?: ProbeAllocation;
 };
 
-type Dot = { x: number; y: number; on: boolean };
+type Dot = { x: number; y: number; on: boolean; phase: number };
+type Particle = { x: number; y: number; vx: number; vy: number; radius: number; alpha: number };
+type ProbeEntity = { x: number; y: number; vx: number; vy: number; trail: { x: number; y: number }[]; trailLen: number };
 
-export default function UniverseVisualizer({ stageId, matterRemaining, className }: Props) {
+type VizState = {
+  stageId: StageId;
+  dots: Dot[];
+  onCount: number;
+  particles: Particle[];
+  probes: ProbeEntity[];
+};
+
+export default function UniverseVisualizer({
+  stageId,
+  matterRemaining,
+  className,
+  probes: probesProp,
+  probesUnlocked = false,
+  allocation = { replicate: 0, harvest: 0, manufacture: 0 }
+}: Props) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
-  const stateRef = React.useRef<{ stageId: StageId; dots: Dot[]; onCount: number } | null>(
-    null
-  );
+  const stateRef = React.useRef<VizState | null>(null);
 
   const [animatedMatter, setAnimatedMatter] = React.useState(matterRemaining);
   const onAnimatedMatterChange = React.useCallback((value: Decimal) => {
@@ -26,14 +44,29 @@ export default function UniverseVisualizer({ stageId, matterRemaining, className
 
   useAnimatedNumber(matterRemaining, onAnimatedMatterChange);
 
-  const inputsRef = React.useRef<{ stageId: StageId; matterRemaining: Decimal }>({
+  const inputsRef = React.useRef<{
+    stageId: StageId;
+    matterRemaining: Decimal;
+    probes: Decimal;
+    probesUnlocked: boolean;
+    allocation: ProbeAllocation;
+  }>({
     stageId,
-    matterRemaining: animatedMatter
+    matterRemaining: animatedMatter,
+    probes: probesProp ?? new Decimal(0),
+    probesUnlocked,
+    allocation
   });
 
   React.useEffect(() => {
-    inputsRef.current = { stageId, matterRemaining: animatedMatter };
-  }, [stageId, animatedMatter]);
+    inputsRef.current = {
+      stageId,
+      matterRemaining: animatedMatter,
+      probes: probesProp ?? new Decimal(0),
+      probesUnlocked,
+      allocation
+    };
+  }, [stageId, animatedMatter, probesProp, probesUnlocked, allocation]);
 
   React.useEffect(() => {
     const canvas = canvasRef.current;
@@ -57,8 +90,8 @@ export default function UniverseVisualizer({ stageId, matterRemaining, className
 
     const loop = () => {
       raf = window.requestAnimationFrame(loop);
-      const { stageId: sId, matterRemaining: m } = inputsRef.current;
-      draw(ctx, canvas, sId, m, stateRef);
+      const { stageId: sId, matterRemaining: m, probes: p, probesUnlocked: pu, allocation: a } = inputsRef.current;
+      draw(ctx, canvas, sId, m, p, pu, a, stateRef);
     };
     raf = window.requestAnimationFrame(loop);
 
