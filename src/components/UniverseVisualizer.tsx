@@ -3,6 +3,7 @@ import { STAGE_BY_ID } from "@/game/constants";
 import type { StageId } from "@/game/types";
 import type Decimal from "break_eternity.js";
 import { cn } from "@/lib/utils";
+import { useAnimatedNumber } from "@/hooks";
 
 type Props = {
   stageId: StageId;
@@ -17,14 +18,22 @@ export default function UniverseVisualizer({ stageId, matterRemaining, className
   const stateRef = React.useRef<{ stageId: StageId; dots: Dot[]; onCount: number } | null>(
     null
   );
+
+  const [animatedMatter, setAnimatedMatter] = React.useState(matterRemaining);
+  const onAnimatedMatterChange = React.useCallback((value: Decimal) => {
+    setAnimatedMatter(value);
+  }, []);
+
+  useAnimatedNumber(matterRemaining, onAnimatedMatterChange);
+
   const inputsRef = React.useRef<{ stageId: StageId; matterRemaining: Decimal }>({
     stageId,
-    matterRemaining
+    matterRemaining: animatedMatter
   });
 
   React.useEffect(() => {
-    inputsRef.current = { stageId, matterRemaining };
-  }, [stageId, matterRemaining]);
+    inputsRef.current = { stageId, matterRemaining: animatedMatter };
+  }, [stageId, animatedMatter]);
 
   React.useEffect(() => {
     const canvas = canvasRef.current;

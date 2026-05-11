@@ -24,6 +24,8 @@ import {
   getProbeDesignCost
 } from "@/game/game";
 import { clearSave, loadState, saveState } from "@/game/storage";
+import { useAnimatedNumber } from "@/hooks";
+import Decimal from "break_eternity.js";
 
 export default function App() {
   const [activeTab, setActiveTab] = React.useState<"dashboard" | "singularity">("dashboard");
@@ -76,6 +78,20 @@ export default function App() {
 
   const machineClipRate = getMachineClipRate(state);
   const wireRate = getWireRate(state);
+
+  const [animatedMachineClipRate, setAnimatedMachineClipRate] = React.useState(machineClipRate);
+  const [animatedWireRate, setAnimatedWireRate] = React.useState(wireRate);
+
+  const onMachineClipRateChange = React.useCallback((value: Decimal) => {
+    setAnimatedMachineClipRate(value);
+  }, []);
+
+  const onWireRateChange = React.useCallback((value: Decimal) => {
+    setAnimatedWireRate(value);
+  }, []);
+
+  useAnimatedNumber(machineClipRate, onMachineClipRateChange);
+  useAnimatedNumber(wireRate, onWireRateChange);
 
   const autoCost = autoClipperCost(state);
   const megaCost = megaClipperCost(state);
@@ -165,16 +181,16 @@ export default function App() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="font-mono text-xs text-muted-foreground">
                         Output:{" "}
-                        <span className="text-foreground">{formatRate(machineClipRate)}</span>
+                        <span className="text-foreground">{formatRate(animatedMachineClipRate)}</span>
                       </div>
                       <div className="font-mono text-xs text-muted-foreground">
                         Wire intake:{" "}
                         <span
                           className={
-                            wireRate.lt(machineClipRate) ? "text-red-500" : "text-foreground"
+                            animatedWireRate.lt(animatedMachineClipRate) ? "text-red-500" : "text-foreground"
                           }
                         >
-                          {formatRate(wireRate)}
+                          {formatRate(animatedWireRate)}
                         </span>
                       </div>
                     </div>
