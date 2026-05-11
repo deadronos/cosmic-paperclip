@@ -14,7 +14,7 @@ describe('useAnimatedNumber', () => {
 
   it('interpolates from 0 to 100', () => {
     const onChange = vi.fn();
-    const { result } = renderHook(() =>
+    renderHook(() =>
       useAnimatedNumber(new Decimal(100), onChange)
     );
 
@@ -31,7 +31,7 @@ describe('useAnimatedNumber', () => {
 
   it('completes and stops when within 0.01 of target', () => {
     const onChange = vi.fn();
-    const { result } = renderHook(() =>
+    renderHook(() =>
       useAnimatedNumber(new Decimal(1), onChange)
     );
 

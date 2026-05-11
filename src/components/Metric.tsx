@@ -14,7 +14,10 @@ export default function Metric({
 }) {
   const [displayValue, setDisplayValue] = React.useState<string>('');
 
-  const decimalValue = typeof value === 'string' ? new Decimal(value) : value;
+  const decimalValue = React.useMemo(
+    () => (typeof value === 'string' ? new Decimal(value) : value),
+    [value]
+  );
 
   const handleChange = React.useCallback((v: Decimal) => {
     setDisplayValue(formatNumber(v));

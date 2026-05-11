@@ -25,6 +25,7 @@ import {
 } from "@/game/game";
 import { clearSave, loadState, saveState } from "@/game/storage";
 import { useAnimatedNumber } from "@/hooks";
+import Decimal from "break_eternity.js";
 
 export default function App() {
   const [activeTab, setActiveTab] = React.useState<"dashboard" | "singularity">("dashboard");
