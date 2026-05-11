@@ -120,7 +120,10 @@ function draw(
   canvas: HTMLCanvasElement,
   stageId: StageId,
   matterRemaining: Decimal,
-  stateRef: React.MutableRefObject<{ stageId: StageId; dots: Dot[]; onCount: number } | null>
+  probes: Decimal,
+  probesUnlocked: boolean,
+  allocation: ProbeAllocation,
+  stateRef: React.MutableRefObject<VizState | null>
 ) {
   const stage = STAGE_BY_ID[stageId];
   const remainingFrac =
@@ -140,10 +143,14 @@ function draw(
           ? 1900
           : 2600;
 
+  const pCount = particleCount(stageId);
   const current = stateRef.current;
-  if (!current || current.stageId !== stageId || current.dots.length !== dotCount) {
+  if (!current || current.stageId !== stageId || current.dots.length !== dotCount || current.particles.length !== pCount) {
     const dots = createDots(dotCount, w, h);
-    stateRef.current = { stageId, dots, onCount: 0 };
+    const particles = current && current.stageId === stageId && current.particles.length === pCount
+      ? current.particles
+      : createParticles(pCount, w, h);
+    stateRef.current = { stageId, dots, onCount: current?.onCount ?? 0, particles, probes: current?.probes ?? [] };
   }
 
   const s = stateRef.current!;
@@ -168,6 +175,23 @@ function draw(
   ctx.fillStyle = "rgba(255,255,255,0.05)";
   ctx.fillRect(0, 0, w, h);
 
+  const elapsed = performance.now() / 1000;
+  const pad2 = 18;
+
+  for (const p of s.particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    if (p.x < pad2) p.x = w - pad2;
+    if (p.x > w - pad2) p.x = pad2;
+    if (p.y < pad2) p.y = h - pad2;
+    if (p.y > h - pad2) p.y = pad2;
+
+    ctx.fillStyle = `rgba(255,155,70,${p.alpha})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   for (const d of s.dots) {
     ctx.fillStyle = d.on ? "rgba(255,155,70,0.85)" : "rgba(160,170,185,0.18)";
     ctx.fillRect(d.x, d.y, 2, 2);
@@ -184,9 +208,30 @@ function createDots(count: number, w: number, h: number): Dot[] {
     dots.push({
       x: pad + Math.random() * Math.max(1, w - pad * 2),
       y: pad + Math.random() * Math.max(1, h - pad * 2),
-      on: false
+      on: false,
+      phase: Math.random() * Math.PI * 2
     });
   }
   return dots;
+}
+
+function particleCount(stageId: StageId): number {
+  return stageId === "lab" ? 75 : stageId === "planetary" ? 110 : stageId === "space" ? 150 : 200;
+}
+
+function createParticles(count: number, w: number, h: number): Particle[] {
+  const pad = 18;
+  const particles: Particle[] = [];
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: pad + Math.random() * Math.max(1, w - pad * 2),
+      y: pad + Math.random() * Math.max(1, h - pad * 2),
+      vx: (Math.random() - 0.5) * 0.5,
+      vy: (Math.random() - 0.5) * 0.5,
+      radius: 0.5 + Math.random() * 1,
+      alpha: 0.06 + Math.random() * 0.06
+    });
+  }
+  return particles;
 }
 
