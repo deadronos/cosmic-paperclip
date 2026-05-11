@@ -384,6 +384,9 @@ export default function App() {
                     <UniverseVisualizer
                       stageId={state.stageId}
                       matterRemaining={state.matter}
+                      probes={state.probes}
+                      probesUnlocked={state.probesUnlocked}
+                      allocation={state.allocation}
                       className="h-full"
                     />
                   </div>
