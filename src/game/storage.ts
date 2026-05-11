@@ -1,6 +1,6 @@
 import Decimal from "break_eternity.js";
 import { createInitialState } from "@/game/game";
-import type { GameState, StageId, ProbeAllocation, PrestigeUpgradeId } from "@/game/types";
+import type { GameState, StageId, ProbeAllocation, PrestigeUpgradeId, AchievementId } from "@/game/types";
 
 const KEY_V1 = "cosmic-paperclip:save:v1";
 const KEY_V2 = "cosmic-paperclip:save:v2";
@@ -49,6 +49,7 @@ type SavedStateV3 = Omit<SavedStateV2, "version"> & {
   quantumFlux: string;
   prestigeUpgrades: Record<PrestigeUpgradeId, number>;
   timesPrestiged: number;
+  achievements?: AchievementId[];
 };
 
 export function loadState(): GameState | null {
@@ -133,6 +134,7 @@ function dehydrateV3(state: GameState): SavedStateV3 {
     quantumFlux: state.quantumFlux.toString(),
     prestigeUpgrades: state.prestigeUpgrades,
     timesPrestiged: state.timesPrestiged,
+    achievements: state.achievements,
   };
 }
 
@@ -146,6 +148,7 @@ function hydrateV3(saved: SavedStateV3): GameState {
     allocation: saved.allocation ?? initial.allocation,
     news: Array.isArray(saved.news) ? saved.news : initial.news,
     milestoneFlags: saved.milestoneFlags ?? initial.milestoneFlags,
+    achievements: Array.isArray(saved.achievements) ? saved.achievements : initial.achievements,
     matter: new Decimal(saved.matter),
     wire: new Decimal(saved.wire),
     clips: new Decimal(saved.clips),

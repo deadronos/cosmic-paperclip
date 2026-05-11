@@ -2,6 +2,7 @@ import { COSTS, RATES, STAGES, STAGE_BY_ID, PRESTIGE_UPGRADES } from "@/game/con
 import { normalizeAllocation } from "@/game/allocation";
 import { getWireRate, getMachineClipRate } from "@/game/selectors";
 import { maybeEmitMilestones, pushNews } from "@/game/news";
+import { checkAchievements } from "@/game/achievements";
 import Decimal from "break_eternity.js";
 import type { GameState, ProbeAllocation, StageId, PrestigeUpgradeId } from "@/game/types";
 
@@ -65,6 +66,7 @@ export function createInitialState(preserve?: Partial<GameState>): GameState {
       "A single wire rests on a sterile bench."
     ],
     milestoneFlags: {},
+    achievements: preserve?.achievements || [],
     quantumFlux: preserve?.quantumFlux || new Decimal(0),
     prestigeUpgrades,
     timesPrestiged: preserve?.timesPrestiged || 0,
@@ -81,30 +83,34 @@ export function reducer(state: GameState, action: GameAction): GameState {
       if (next.wire.gte(1)) {
         next = { ...next, wire: next.wire.minus(1), clips: next.clips.plus(1) };
       }
-      return next;
+      return unlockAchievements(next);
     }
     case "BUY_AUTO": {
       const cost = autoClipperCost(state);
       if (state.clips.lt(cost)) return state;
-      return pushNews(
-        {
-          ...state,
-          clips: state.clips.minus(cost),
-          autoClippers: state.autoClippers + 1
-        },
-        "Auto-Clipper commissioned. Efficiency rises."
+      return unlockAchievements(
+        pushNews(
+          {
+            ...state,
+            clips: state.clips.minus(cost),
+            autoClippers: state.autoClippers + 1
+          },
+          "Auto-Clipper commissioned. Efficiency rises."
+        )
       );
     }
     case "BUY_MEGA": {
       const cost = megaClipperCost(state);
       if (state.clips.lt(cost)) return state;
-      return pushNews(
-        {
-          ...state,
-          clips: state.clips.minus(cost),
-          megaClippers: state.megaClippers + 1
-        },
-        "Mega-Clipper online. Industrial throughput enabled."
+      return unlockAchievements(
+        pushNews(
+          {
+            ...state,
+            clips: state.clips.minus(cost),
+            megaClippers: state.megaClippers + 1
+          },
+          "Mega-Clipper online. Industrial throughput enabled."
+        )
       );
     }
     case "BUY_HARVESTER": {
@@ -175,11 +181,14 @@ export function reducer(state: GameState, action: GameAction): GameState {
     case "PRESTIGE": {
       if (state.stageId !== "universal") return state;
       const fluxGained = calculatePotentialFlux(state);
-      return createInitialState({
-        quantumFlux: state.quantumFlux.plus(fluxGained),
-        prestigeUpgrades: state.prestigeUpgrades,
-        timesPrestiged: state.timesPrestiged + 1
-      });
+      return unlockAchievements(
+        createInitialState({
+          quantumFlux: state.quantumFlux.plus(fluxGained),
+          prestigeUpgrades: state.prestigeUpgrades,
+          timesPrestiged: state.timesPrestiged + 1,
+          achievements: state.achievements
+        })
+      );
     }
     case "BUY_PRESTIGE_UPGRADE": {
       const upgradeDef = PRESTIGE_UPGRADES.find(u => u.id === action.upgradeId);
@@ -275,7 +284,7 @@ function tick(state: GameState, dt: number): GameState {
 
   next = maybeEmitMilestones(next);
   next = maybeAdvanceStage(next);
-  return next;
+  return unlockAchievements(next);
 }
 
 function maybeAdvanceStage(state: GameState): GameState {
@@ -322,6 +331,15 @@ export function getProbeDesignCost(state: GameState): Decimal {
 
 export function getPrestigeUpgradeCost(upgrade: { baseCost: number; costGrowth: number }, level: number): Decimal {
   return Decimal.pow(upgrade.costGrowth, level).times(upgrade.baseCost).floor();
+}
+
+function unlockAchievements(state: GameState): GameState {
+  const newlyUnlocked = checkAchievements(state);
+  if (newlyUnlocked.length === 0) return state;
+  return {
+    ...state,
+    achievements: [...state.achievements, ...newlyUnlocked]
+  };
 }
 
 
