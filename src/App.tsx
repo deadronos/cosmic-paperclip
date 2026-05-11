@@ -7,6 +7,7 @@ import Metric from "@/components/Metric";
 import BuyRow from "@/components/BuyRow";
 import AllocationRow from "@/components/AllocationRow";
 import PrestigeStore from "@/components/PrestigeStore";
+import RateProjection from "@/components/RateProjection";
 import AchievementToast from "@/components/AchievementToast";
 import Achievements from "@/components/Achievements";
 import { Badge } from "@/components/ui/badge";
@@ -211,6 +212,8 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+
+                  <RateProjection state={state} clipRate={machineClipRate} />
 
                   <div className="grid grid-cols-2 gap-2">
                     <Button
