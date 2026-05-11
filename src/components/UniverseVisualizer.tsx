@@ -2,6 +2,7 @@ import * as React from "react";
 import { STAGE_BY_ID } from "@/game/constants";
 import type { StageId, ProbeAllocation } from "@/game/types";
 import type Decimal from "break_eternity.js";
+import { D } from "@/game/decimal";
 import { cn } from "@/lib/utils";
 import { useAnimatedNumber } from "@/hooks";
 
@@ -53,7 +54,7 @@ export default function UniverseVisualizer({
   }>({
     stageId,
     matterRemaining: animatedMatter,
-    probes: probesProp ?? new Decimal(0),
+    probes: probesProp ?? D(0),
     probesUnlocked,
     allocation
   });
@@ -62,7 +63,7 @@ export default function UniverseVisualizer({
     inputsRef.current = {
       stageId,
       matterRemaining: animatedMatter,
-      probes: probesProp ?? new Decimal(0),
+      probes: probesProp ?? D(0),
       probesUnlocked,
       allocation
     };
@@ -111,10 +112,11 @@ export default function UniverseVisualizer({
           <span className="flex items-center gap-1">
             {(() => {
               if (!probesUnlocked) return "Signal: idle";
-              if (probesProp?.eq(0) ?? true) return "Signal: waiting";
+              const p = probesProp ?? D(0);
+              if (p.eq(0)) return "Signal: waiting";
               return (
                 <>
-                  <span>Probes: {Math.floor(probesProp.toNumber())}</span>
+                  <span>Probes: {Math.floor(p.toNumber())}</span>
                   <span className="mx-1">|</span>
                   <span className="text-green-400 animate-pulse">Signal: active</span>
                 </>
