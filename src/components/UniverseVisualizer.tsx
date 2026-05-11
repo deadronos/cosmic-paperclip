@@ -216,7 +216,7 @@ function draw(
 
   const probeCount = Math.min(50, Math.ceil(probes.div(10).toNumber()));
   s.probes = ensureProbes(probeCount, w, h, s.probes, probesUnlocked);
-  updateProbeEntities(s.probes, w, h, elapsed);
+  updateProbeEntities(s.probes, w, h);
 
   if (probesUnlocked && probes.gt(0)) {
     const color = probeColor(allocation);
@@ -319,8 +319,7 @@ function ensureProbes(
 function updateProbeEntities(
   entities: ProbeEntity[],
   w: number,
-  h: number,
-  elapsed: number
+  h: number
 ): void {
   const pad = 18;
   for (const e of entities) {
