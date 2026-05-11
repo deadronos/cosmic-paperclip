@@ -7,6 +7,8 @@ import Metric from "@/components/Metric";
 import BuyRow from "@/components/BuyRow";
 import AllocationRow from "@/components/AllocationRow";
 import PrestigeStore from "@/components/PrestigeStore";
+import AchievementToast from "@/components/AchievementToast";
+import Achievements from "@/components/Achievements";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +28,7 @@ import {
 import { clearSave, loadState, saveState } from "@/game/storage";
 import { useAnimatedNumber } from "@/hooks";
 import Decimal from "break_eternity.js";
+import type { AchievementId } from "@/game/types";
 
 export default function App() {
   const [activeTab, setActiveTab] = React.useState<"dashboard" | "singularity">("dashboard");
@@ -50,6 +53,19 @@ export default function App() {
     stateRef.current = state;
   }, [state]);
   const stage = STAGE_BY_ID[state.stageId];
+
+  const [toasts, setToasts] = React.useState<AchievementId[]>([]);
+  const prevAchievementsRef = React.useRef<AchievementId[]>(state.achievements);
+
+  React.useEffect(() => {
+    const prev = prevAchievementsRef.current;
+    const curr = state.achievements;
+    const newIds = curr.filter((id) => !prev.includes(id));
+    if (newIds.length > 0) {
+      setToasts((prev) => [...prev, ...newIds]);
+    }
+    prevAchievementsRef.current = curr;
+  }, [state.achievements]);
 
   React.useEffect(() => {
     let last = performance.now();
@@ -410,6 +426,15 @@ export default function App() {
                   </div>
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle>ACHIEVEMENTS</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Achievements unlocked={state.achievements} />
+                </CardContent>
+              </Card>
             </div>
           </>
         ) : (
@@ -417,6 +442,17 @@ export default function App() {
             <PrestigeStore state={state} dispatch={dispatch} />
           </div>
         )}
+      </div>
+
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+        {toasts.map((id) => (
+          <div key={id} className="pointer-events-auto">
+            <AchievementToast
+              achievementId={id}
+              onDone={() => setToasts((prev) => prev.filter((t) => t !== id))}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );

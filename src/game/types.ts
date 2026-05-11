@@ -1,4 +1,7 @@
 import type Decimal from "break_eternity.js";
+import type { AchievementId } from "@/game/achievements";
+
+export type { AchievementId };
 
 export type StageId = "lab" | "planetary" | "space" | "universal";
 
@@ -49,6 +52,7 @@ export type GameState = {
   };
   news: string[];
   milestoneFlags: Record<string, { half: boolean; ten: boolean; one: boolean }>;
+  achievements: AchievementId[];
   
   // Prestige fields
   quantumFlux: Decimal;
