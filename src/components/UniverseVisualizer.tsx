@@ -193,7 +193,12 @@ function draw(
   }
 
   for (const d of s.dots) {
-    ctx.fillStyle = d.on ? "rgba(255,155,70,0.85)" : "rgba(160,170,185,0.18)";
+    if (d.on) {
+      const pulseAlpha = 0.65 + Math.sin(elapsed * 2 + d.phase) * 0.15;
+      ctx.fillStyle = `rgba(255,155,70,${pulseAlpha.toFixed(3)})`;
+    } else {
+      ctx.fillStyle = "rgba(160,170,185,0.18)";
+    }
     ctx.fillRect(d.x, d.y, 2, 2);
   }
 
